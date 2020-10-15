@@ -7,7 +7,7 @@
 
 RayRenderer::RayRenderer()
 {
-	{
+	{ // middle
 		SphereObject sphere;
 		sphere.mySphere.InitWithCenterAndRadius({ 0,0,0 }, 50.0);
 		sphere.mySurfaceColor = V4F(1, 1, 1, 1);
@@ -15,7 +15,7 @@ RayRenderer::RayRenderer()
 
 		mySpheres.push_back(sphere);
 	}
-	{
+	{ // front top right
 		SphereObject sphere;
 		sphere.mySphere.InitWithCenterAndRadius({ 30,30,-70 }, 20.0);
 		sphere.mySurfaceColor = V4F(0.9, 0.8, 1, 1);
@@ -25,11 +25,11 @@ RayRenderer::RayRenderer()
 	}
 
 
-	{
+	{ // bottom left corner
 		TriObject tri;
-		tri.myCorners[0] = V3D(-20, -150, 90);
-		tri.myCorners[1] = V3D(-150, -20, 90);
-		tri.myCorners[2] = V3D(-150, -150, 0);
+		tri.myCorners[0] = V3D(-20, -140, 90);
+		tri.myCorners[1] = V3D(-140, -20, 90);
+		tri.myCorners[2] = V3D(-140, -140, 0);
 		tri.mySurfaceColor = V4F(1, 0.8, 0.7, 1);
 		tri.myDiffusion = 0.2;
 		tri.myIsLight = false;
@@ -37,7 +37,7 @@ RayRenderer::RayRenderer()
 		myTris.push_back(tri);
 	}
 
-	{
+	{ // light 1
 		TriObject tri;
 		tri.myCorners[0] = V3D(-20, 140, 90);
 		tri.myCorners[1] = V3D(-140, 140, 90);
@@ -48,7 +48,7 @@ RayRenderer::RayRenderer()
 
 		myTris.push_back(tri);
 	}
-	{
+	{ // light 2
 		TriObject tri;
 		tri.myCorners[0] = V3D(-20, 140, 90);
 		tri.myCorners[1] = V3D(-20, 140, 0);
@@ -60,7 +60,7 @@ RayRenderer::RayRenderer()
 		myTris.push_back(tri);
 	}
 
-	{
+	{// left wall 1
 		TriObject tri;
 		tri.myCorners[0] = V3D(-140, 140, 90);
 		tri.myCorners[1] = V3D(-140, 140, -90);
@@ -71,11 +71,45 @@ RayRenderer::RayRenderer()
 
 		myTris.push_back(tri);
 	}
-	{
+	{ // left wall 2
 		TriObject tri;
 		tri.myCorners[0] = V3D(-140, 140, 90);
 		tri.myCorners[1] = V3D(-140, -140, -90);
 		tri.myCorners[2] = V3D(-140, -140, 90);
+		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
+		tri.myDiffusion = 0.05;
+		tri.myIsLight = false;
+
+		myTris.push_back(tri);
+	}
+
+	{ // back wall 1
+		TriObject tri;
+		tri.myCorners[0] = V3D(-20, -140, 90);
+		tri.myCorners[1] = V3D(-20, -20, 90);
+		tri.myCorners[2] = V3D(-140, -20, 90);
+		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
+		tri.myDiffusion = 0.05;
+		tri.myIsLight = false;
+
+		myTris.push_back(tri);
+	}
+	{ // back wall 2
+		TriObject tri;
+		tri.myCorners[0] = V3D(-20, 140, 90);
+		tri.myCorners[1] = V3D(-140, -20, 90);
+		tri.myCorners[2] = V3D(-20, -20, 90);
+		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
+		tri.myDiffusion = 0.05;
+		tri.myIsLight = false;
+
+		myTris.push_back(tri);
+	}
+	{ // back wall 3
+		TriObject tri;
+		tri.myCorners[0] = V3D(-20, 140, 90);
+		tri.myCorners[1] = V3D(-140, 140, 90);
+		tri.myCorners[2] = V3D(-140, -20, 90);
 		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
 		tri.myDiffusion = 0.05;
 		tri.myIsLight = false;

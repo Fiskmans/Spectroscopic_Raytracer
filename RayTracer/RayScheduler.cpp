@@ -21,12 +21,47 @@ RayScheduler::RayScheduler(size_t aWidth, size_t aHeight, ID3D11Texture2D* aTarg
 	{
 		myCPUTexture[i] = V4F(((rand() % 100) / 100.0), ((rand() % 100) / 100.0), ((rand() % 100) / 100.0), 1.f);
 	}
+
+	size_t hardwareThreads = std::thread::hardware_concurrency();
+	if (hardwareThreads < 4)
+	{
+		hardwareThreads = 4;
+	}
+	size_t renderThreads = hardwareThreads - 1;
+
+	myKillSwitch = new bool[64*3] + 64; // guarantee killswich is on it's own cacheline on machines with cachelines < 64byte (most/all of them at time of writing)
+	*myKillSwitch = false;
+
+	myJobsSlots.reserve(renderThreads);
+	for (size_t i = 0; i < renderThreads; i++)
+	{
+		myJobsSlots.emplace_back();
+		myWorkers.emplace_back([this, i]()
+			{
+				NAMETHREAD((L"Ray render worker thread: " + std::to_wstring(i)).c_str());
+				bool* killswitch = myKillSwitch;
+				while (!*killswitch)
+				{
+					Result job;
+					myJobsSlots[i].FetchJob(job);
+					RenderPixel(job);
+					myJobsSlots[i].GiveResult(job);
+				}
+			});
+	}
+
 }
 
 RayScheduler::~RayScheduler()
 {
 	SAFE_RELEASE(myTargetTexture);
 	SAFE_DELETE_ARRAY(myCPUTexture);
+	*myKillSwitch = false;
+	for (auto& i : myWorkers)
+	{
+		i.join();
+	}
+	delete[] (myKillSwitch - 64);
 }
 
 void RayScheduler::PushToHardware()
@@ -95,17 +130,26 @@ void RayScheduler::Imgui()
 
 void RayScheduler::Update()
 {
-	for (size_t i = 0; i < myPending.size(); i++)
+	for (auto& job : myJobsSlots)
 	{
-		if (myPending[i].wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+		Result res;
+		if (job.FetchResult(res))
 		{
-			Result res = myPending[i].get();
 			myCPUTexture[res.x + res.y * myWidth] = res.color;
-			myPending.erase(myPending.begin() + i);
 		}
 	}
 
-	while (myPending.size() < 64 && !mySections.empty())
+	while (!myUnassigned.empty())
+	{
+		Result job = myUnassigned.back();
+		myUnassigned.pop_back();
+		if (!Schedule(job))
+		{
+			break;
+		}
+	}
+
+	while (myUnassigned.empty() && !mySections.empty())
 	{
 		Section sec = mySections.back();
 		mySections.pop_back();
@@ -113,19 +157,13 @@ void RayScheduler::Update()
 		int width = (sec.z - sec.x);
 		int heigth = (sec.w - sec.y);
 
-		if (width * heigth > 64)
+		if (width * heigth > 16)
 		{
 			SplitSection(sec);
 		}
 		else
 		{
-			for (int x = sec.x; x < sec.z; x++)
-			{
-				for (int y = sec.y; y < sec.w; y++)
-				{
-					myPending.push_back(std::async(std::bind(&RayScheduler::RenderPixel, this, x, y)));
-				}
-			}
+			WorkSection(sec);
 		}
 	}
 }
@@ -142,22 +180,92 @@ void RayScheduler::SplitSection(Section aSection)
 	mySections.push_back({ aSection.x+width,aSection.y+heigth,aSection.z,aSection.w });
 }
 
-RayScheduler::Result RayScheduler::RenderPixel(int x, int y)
+void RayScheduler::WorkSection(Section aSection)
 {
-	NAMETHREAD((L"RayRender x:" + std::to_wstring(x)  + L" y:" + std::to_wstring(y)).c_str());
+	for (int x = aSection.x; x < aSection.z; x++)
+	{
+		for (int y = aSection.y; y < aSection.w; y++)
+		{
+			Result job;
+			job.x = x;
+			job.y = y;
+			Schedule(job);
+		}
+	}
+}
 
-	float screenX = (static_cast<float>(x) / static_cast<float>(myWidth));
-	float screenY = (static_cast<float>(y) / static_cast<float>(myHeight));
+void RayScheduler::RenderPixel(Result& aResult)
+{
+	float screenX = (static_cast<float>(aResult.x) / static_cast<float>(myWidth));
+	float screenY = (static_cast<float>(aResult.y) / static_cast<float>(myHeight));
 
 	V3F from = myCamera->Unproject(V3F(screenX,screenY,0));
 	V3F to = myCamera->Unproject(V3F(screenX, screenY, 1));
 	CommonUtilities::Ray<double> ray;
 	ray.InitWith2Points(CommonUtilities::Vector3<double>(from.x, from.y, from.z), CommonUtilities::Vector3<double>(to.x, to.y, to.z));
 
-	Result res;
-	res.x = x;
-	res.y = y;
-	res.color = myRenderer(ray);
+	aResult.color = myRenderer(ray);
+}
 
-	return res;
+bool RayScheduler::Schedule(RayScheduler::Result aJob)
+{
+	for (auto& slot : myJobsSlots)
+	{
+		if (slot.GiveJob(aJob))
+		{
+			return true;
+		}
+	}
+	myUnassigned.push_back(aJob);
+	return false;
+}
+
+bool RayScheduler::Job::GiveJob(RayScheduler::Result& aJob)
+{
+	auto* currentStatus = myToStart.load();
+
+	if (currentStatus)
+	{
+		return false;
+	}
+	myToWorkData = aJob;
+	myToStart.store(&myToWorkData);
+	return true;
+}
+
+void RayScheduler::Job::FetchJob(RayScheduler::Result& aJob)
+{
+	RayScheduler::Result* currentStatus;
+	do
+	{
+		currentStatus = myToStart.load();
+	} while (!currentStatus);
+
+	aJob = *currentStatus;
+	myToStart.store(nullptr);
+}
+
+void RayScheduler::Job::GiveResult(RayScheduler::Result& aResult)
+{
+	RayScheduler::Result* currentStatus;
+	do
+	{
+		currentStatus = myReady.load();
+	} while (currentStatus);
+
+	myReadyData = aResult;
+	myReady.store(&myReadyData);
+}
+
+bool RayScheduler::Job::FetchResult(RayScheduler::Result& aResult)
+{
+	auto* currentStatus = myReady.load();
+
+	if (!currentStatus)
+	{
+		return false;
+	}
+	aResult = *currentStatus;
+	myReady.store(nullptr);
+	return true;
 }
