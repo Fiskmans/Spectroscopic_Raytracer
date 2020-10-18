@@ -11,6 +11,7 @@ RayScheduler::RayScheduler(size_t aWidth, size_t aHeight, ID3D11Texture2D* aTarg
 	myCamera = aCamera;
 	myContext = aContext;
 	myRenderer = aRenderFunction;
+	mySPP = 5;
 
 	SplitSection(Section(0,0,myWidth,myHeight));
 
@@ -19,7 +20,7 @@ RayScheduler::RayScheduler(size_t aWidth, size_t aHeight, ID3D11Texture2D* aTarg
 	myCPUTexture = new V4F[pixelCount];
 	for (size_t i = 0; i < pixelCount; i++)
 	{
-		myCPUTexture[i] = V4F(((rand() % 100) / 100.0), ((rand() % 100) / 100.0), ((rand() % 100) / 100.0), 1.f);
+		myCPUTexture[i] = V4F(0,0,0,1);// V4F(((rand() % 100) / 100.0), ((rand() % 100) / 100.0), ((rand() % 100) / 100.0), 1.f);
 	}
 
 	size_t hardwareThreads = std::thread::hardware_concurrency();
@@ -91,6 +92,17 @@ void RayScheduler::Imgui()
 {
 	WindowControl::Window("Scheduler", [this]()
 		{
+			int wanted = mySPP;
+			if (ImGui::InputInt("Samples per pixel", &wanted))
+			{
+				if (wanted > 1)
+				{
+					mySPP = wanted;
+					mySections.clear();
+					SplitSection(Section(0, 0, myWidth, myHeight));
+				}
+			}
+
 			if (ImGui::TreeNode("sections"))
 			{
 				size_t count = 0;
@@ -204,7 +216,12 @@ void RayScheduler::RenderPixel(Result& aResult)
 	CommonUtilities::Ray<double> ray;
 	ray.InitWith2Points(CommonUtilities::Vector3<double>(from.x, from.y, from.z), CommonUtilities::Vector3<double>(to.x, to.y, to.z));
 
-	aResult.color = myRenderer(ray);
+
+	aResult.color = V4F(0, 0, 0, 0);
+	for (size_t i = 0; i < mySPP; i++)
+	{
+		aResult.color += myRenderer(ray) / float(mySPP);
+	}
 }
 
 bool RayScheduler::Schedule(RayScheduler::Result aJob)

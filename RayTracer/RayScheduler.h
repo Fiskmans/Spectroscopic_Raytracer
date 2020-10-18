@@ -76,6 +76,7 @@ private:
 	size_t myHeight;
 	Camera* myCamera;
 	bool* myKillSwitch;
+	size_t mySPP;
 
 	ID3D11DeviceContext* myContext;
 	ID3D11Texture2D* myTargetTexture;

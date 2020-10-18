@@ -53,8 +53,7 @@ private:
 	RayHit Cast(RAY aRay) const;
 	
 
-	int myMaxDepth = 3;
-	int myMaxSamples = 8600;
+	int myMaxDepth = 8;
 
 	std::vector<SphereObject> mySpheres;
 	std::vector<TriObject> myTris;

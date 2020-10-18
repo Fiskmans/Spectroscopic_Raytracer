@@ -5,6 +5,8 @@
 #include "Random.h"
 
 
+//https://learn.foundry.com/modo/content/help/pages/shading_lighting/shader_items/refract_index.html
+
 RayRenderer::RayRenderer()
 {
 	{ // middle
@@ -116,6 +118,28 @@ RayRenderer::RayRenderer()
 
 		myTris.push_back(tri);
 	}
+	{ // back wall 4
+		TriObject tri;
+		tri.myCorners[0] = V3D(-20, 140, 90);
+		tri.myCorners[1] = V3D(-20, -140, 90);
+		tri.myCorners[2] = V3D(140, -20, 140);
+		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
+		tri.myDiffusion = 0.05;
+		tri.myIsLight = false;
+
+		myTris.push_back(tri);
+	}
+	//{ // back wall 5
+	//	TriObject tri;
+	//	tri.myCorners[0] = V3D(-20, 140, 90);
+	//	tri.myCorners[1] = V3D(-140, -20, 90);
+	//	tri.myCorners[2] = V3D(140, -20, 90);
+	//	tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
+	//	tri.myDiffusion = 0.05;
+	//	tri.myIsLight = false;
+	//
+	//	myTris.push_back(tri);
+	//}
 }
 
 void RayRenderer::SetBoundingSize(double aSize)
@@ -183,35 +207,12 @@ V4F RayRenderer::Evaluate(RAY aRay, int aDepth) const
 	Color *= hitResult.mySurfaceColor;
 	{
 		V3D dir = aRay.Direction().Reflected(hitResult.mySurfaceNormal);
-		std::vector<V4F> samples;
-		double area = hitResult.mySurfaceDiffusíon * hitResult.mySurfaceDiffusíon * 4.0 * PI;
-		double maxArea = 4.0 * PI;
-		int sampleCount = MAX(1, (area / maxArea) * myMaxSamples);
-		if (aDepth > 0)
-		{
-			sampleCount = MAX(1, sampleCount / 8);
-		}
 
-		for (size_t i = 0; i < sampleCount; i++)
-		{
-			RAY sampleRay;
-			V3D sampleDir = dir + V3D(Tools::RandomDirection()) * hitResult.mySurfaceDiffusíon;
-			sampleRay.InitWithOriginAndDirection(hitResult.myLocation + sampleDir * STANDARDMARG, sampleDir);
+		RAY sampleRay;
+		V3D sampleDir = dir + V3D(Tools::RandomDirection()) * hitResult.mySurfaceDiffusíon;
+		sampleRay.InitWithOriginAndDirection(hitResult.myLocation + sampleDir * STANDARDMARG, sampleDir);
 
-			samples.push_back(Evaluate(sampleRay, aDepth + 1));
-		}
-		float totalValue = 0;
-		for (auto& sample : samples)
-		{
-			totalValue += sample.w;
-		}
-		V4F sampleColor = V4F(0, 0, 0, 0);
-		for (auto& sample : samples)
-		{
-			sampleColor += sample * (sample.w / totalValue);
-		}
-		sampleColor.w = 1;
-		Color *= sampleColor;
+		Color *= Evaluate(sampleRay, aDepth + 1);
 	}
 
 	return Color;
