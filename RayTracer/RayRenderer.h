@@ -39,9 +39,9 @@ private:
 		double myOpacity;
 	};
 
-	struct TriObject
+	struct PolyObject
 	{
-		std::array<V3D,3>	myCorners;
+		std::vector<std::array<V3D,3>>	myTris;
 		double myDiffusion;
 		V4F	mySurfaceColor;
 		bool myIsLight;
@@ -51,12 +51,13 @@ private:
 	V4F Evaluate(RAY aRay, int aDepth = 0) const;
 
 	RayHit Cast(RAY aRay) const;
+	RayHit CastAt(RAY aRay, PolyObject aObject, double& t) const;
 	
 
 	int myMaxDepth = 8;
 
 	std::vector<SphereObject> mySpheres;
-	std::vector<TriObject> myTris;
+	std::vector<PolyObject> myPolyObjects;
 
 	double myBoundingSize;
 	CommonUtilities::PlaneVolume<double> myBoundingBox;

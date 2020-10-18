@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "RayScheduler.h"
 #include "Camera.h"
+#include "cachelineSize.h"
+
 
 RayScheduler::RayScheduler(size_t aWidth, size_t aHeight, ID3D11Texture2D* aTargetTexture, Camera* aCamera, ID3D11DeviceContext* aContext, RayRenderer aRenderFunction)
 {
@@ -13,14 +15,15 @@ RayScheduler::RayScheduler(size_t aWidth, size_t aHeight, ID3D11Texture2D* aTarg
 	myRenderer = aRenderFunction;
 	mySPP = 5;
 
-	SplitSection(Section(0,0,myWidth,myHeight));
+	RenderAll();
 
 	size_t pixelCount = aWidth * aHeight;
 
 	myCPUTexture = new V4F[pixelCount];
+	mySamplesInPixel = new unsigned short[pixelCount];
 	for (size_t i = 0; i < pixelCount; i++)
 	{
-		myCPUTexture[i] = V4F(0,0,0,1);// V4F(((rand() % 100) / 100.0), ((rand() % 100) / 100.0), ((rand() % 100) / 100.0), 1.f);
+		mySamplesInPixel[i] = 0;
 	}
 
 	size_t hardwareThreads = std::thread::hardware_concurrency();
@@ -30,7 +33,13 @@ RayScheduler::RayScheduler(size_t aWidth, size_t aHeight, ID3D11Texture2D* aTarg
 	}
 	size_t renderThreads = hardwareThreads - 1;
 
-	myKillSwitch = new bool[64*3] + 64; // guarantee killswich is on it's own cacheline on machines with cachelines < 64byte (most/all of them at time of writing)
+	size_t cachelinesize = cache_line_size();
+	if (cachelinesize == 0)
+	{
+		cachelinesize = 64;
+	}
+
+	myKillSwitch = new bool[cachelinesize * 2] + cachelinesize; // guarantee (ish) killswich is on it's own cacheline
 	*myKillSwitch = false;
 
 	myJobsSlots.reserve(renderThreads);
@@ -62,7 +71,12 @@ RayScheduler::~RayScheduler()
 	{
 		i.join();
 	}
-	delete[] (myKillSwitch - 64);
+	size_t cachelinesize = cache_line_size();
+	if (cachelinesize == 0)
+	{
+		cachelinesize = 64;
+	}
+	delete[] (myKillSwitch - cachelinesize);
 }
 
 void RayScheduler::PushToHardware()
@@ -92,14 +106,17 @@ void RayScheduler::Imgui()
 {
 	WindowControl::Window("Scheduler", [this]()
 		{
+
+			if (ImGui::Button("Render All"))
+			{
+				RenderAll();
+			}
 			int wanted = mySPP;
 			if (ImGui::InputInt("Samples per pixel", &wanted))
 			{
-				if (wanted > 1)
+				if (wanted > 0)
 				{
 					mySPP = wanted;
-					mySections.clear();
-					SplitSection(Section(0, 0, myWidth, myHeight));
 				}
 			}
 
@@ -115,8 +132,9 @@ void RayScheduler::Imgui()
 			}
 		});
 
-	float xscale = 800.f / 816.f;
-	float yscale = 600.f / 640.f;
+
+	float xscale = myWidth / float(myWidth + 16); 
+	float yscale = myHeight / float(myHeight + 40);
 
 	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
 	for (auto& i : mySections)
@@ -137,8 +155,32 @@ void RayScheduler::Imgui()
 		myRenderer.DrawTestRay(ray);
 	}
 
-}
+	if (ImGui::GetIO().KeyCtrl)
+	{
+		static ImVec2 start;
+		if (ImGui::GetIO().MouseClicked[0])
+		{
+			start = ImGui::GetIO().MousePos;
+		}
+		if (ImGui::GetIO().MouseDown[0])
+		{
+			drawList->AddRect(start, ImGui::GetIO().MousePos, ImColor(0, 0, 0, 80));
+		}
+		if (ImGui::GetIO().MouseReleased[0])
+		{
+			ImVec2 end = ImGui::GetIO().MousePos;
+			ImVec2 topleft = ImVec2(MIN(start.x, end.x), MIN(start.y, end.y));
+			ImVec2 bottomRight = ImVec2(MAX(start.x, end.x), MAX(start.y, end.y));
+			Section sec;
+			sec.x = CLAMP(0,myWidth, topleft.x / xscale);
+			sec.y = CLAMP(0,myHeight, topleft.y / yscale);
+			sec.z = CLAMP(1,myWidth, bottomRight.x / xscale);
+			sec.w = CLAMP(1,myHeight, bottomRight.y / yscale);
+			mySections.push_back(sec);
+		}
+	}
 
+}
 
 void RayScheduler::Update()
 {
@@ -147,7 +189,7 @@ void RayScheduler::Update()
 		Result res;
 		if (job.FetchResult(res))
 		{
-			myCPUTexture[res.x + res.y * myWidth] = res.color;
+			ApplyColor(res);
 		}
 	}
 
@@ -201,7 +243,19 @@ void RayScheduler::WorkSection(Section aSection)
 			Result job;
 			job.x = x;
 			job.y = y;
-			Schedule(job);
+			size_t maxSize = (1 << (sizeof(unsigned char) * CHAR_BIT)) - 1;
+			for (size_t i = 0; i < mySPP / maxSize; i++)
+			{
+				job.samples = maxSize;
+				Schedule(job);
+			}
+
+			job.samples = mySPP % maxSize;
+
+			if (job.samples > 0)
+			{
+				Schedule(job);
+			}
 		}
 	}
 }
@@ -218,10 +272,18 @@ void RayScheduler::RenderPixel(Result& aResult)
 
 
 	aResult.color = V4F(0, 0, 0, 0);
-	for (size_t i = 0; i < mySPP; i++)
+	for (size_t i = 0; i < aResult.samples; i++)
 	{
-		aResult.color += myRenderer(ray) / float(mySPP);
+		aResult.color += myRenderer(ray) / float(aResult.samples);
 	}
+}
+
+void RayScheduler::ApplyColor(Result& aResult)
+{
+	size_t index = (aResult.y * myWidth + aResult.x);
+	mySamplesInPixel[index] += aResult.samples;
+
+	myCPUTexture[index] = LERP(myCPUTexture[index], aResult.color, float(aResult.samples) / mySamplesInPixel[index]);
 }
 
 bool RayScheduler::Schedule(RayScheduler::Result aJob)
@@ -235,6 +297,11 @@ bool RayScheduler::Schedule(RayScheduler::Result aJob)
 	}
 	myUnassigned.push_back(aJob);
 	return false;
+}
+
+void RayScheduler::RenderAll()
+{
+	SplitSection(Section(0, 0, myWidth, myHeight));
 }
 
 bool RayScheduler::Job::GiveJob(RayScheduler::Result& aJob)

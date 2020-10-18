@@ -25,9 +25,10 @@ private:
 
 	struct Result
 	{
+		V4F color;
 		int x;
 		int y;
-		V4F color;
+		unsigned char samples;
 	};
 
 	class Job
@@ -60,7 +61,11 @@ private:
 
 	void RenderPixel(Result& aResult);
 
+	void ApplyColor(Result& aResult);
+
 	bool Schedule(Result aJob);
+
+	void RenderAll();
 
 	RayRenderer myRenderer;
 
@@ -71,6 +76,7 @@ private:
 	std::vector<RayScheduler::Result> myUnassigned;
 
 	V4F* myCPUTexture;
+	unsigned short* mySamplesInPixel;
 
 	size_t myWidth;
 	size_t myHeight;

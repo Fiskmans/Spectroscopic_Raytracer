@@ -28,118 +28,41 @@ RayRenderer::RayRenderer()
 
 
 	{ // bottom left corner
-		TriObject tri;
-		tri.myCorners[0] = V3D(-20, -140, 90);
-		tri.myCorners[1] = V3D(-140, -20, 90);
-		tri.myCorners[2] = V3D(-140, -140, 0);
-		tri.mySurfaceColor = V4F(1, 0.8, 0.7, 1);
-		tri.myDiffusion = 0.2;
-		tri.myIsLight = false;
+		PolyObject poly;
+		poly.myTris.push_back({ V3D(-20, -140, 90), V3D(-140, -20, 90), V3D(-140, -140, 0) });
+		poly.mySurfaceColor = V4F(1, 0.8, 0.7, 1);
+		poly.myDiffusion = 0.2;
+		poly.myIsLight = false;
 
-		myTris.push_back(tri);
+		myPolyObjects.push_back(poly);
 	}
 
 	{ // light 1
-		TriObject tri;
-		tri.myCorners[0] = V3D(-20, 140, 90);
-		tri.myCorners[1] = V3D(-140, 140, 90);
-		tri.myCorners[2] = V3D(-140, 140, 0);
-		tri.mySurfaceColor = V4F(1, 1, 1, 1);
-		tri.myDiffusion = 0.0;
-		tri.myIsLight = true;
+		PolyObject poly;
+		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-140, 140, 90), V3D(-140, 140, 0) });
+		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-20, 140, 0), V3D(-140, 140, 0) });
+		poly.mySurfaceColor = V4F(1, 1, 1, 1);
+		poly.myDiffusion = 0.0;
+		poly.myIsLight = true;
 
-		myTris.push_back(tri);
-	}
-	{ // light 2
-		TriObject tri;
-		tri.myCorners[0] = V3D(-20, 140, 90);
-		tri.myCorners[1] = V3D(-20, 140, 0);
-		tri.myCorners[2] = V3D(-140, 140, 0);
-		tri.mySurfaceColor = V4F(1, 1, 1, 1);
-		tri.myDiffusion = 0.0;
-		tri.myIsLight = true;
-
-		myTris.push_back(tri);
+		myPolyObjects.push_back(poly);
 	}
 
-	{// left wall 1
-		TriObject tri;
-		tri.myCorners[0] = V3D(-140, 140, 90);
-		tri.myCorners[1] = V3D(-140, 140, -90);
-		tri.myCorners[2] = V3D(-140, -140, -90);
-		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-		tri.myDiffusion = 0.05;
-		tri.myIsLight = false;
+	{// wall 1
+		PolyObject poly;
+		poly.myTris.push_back({ V3D(-140, 140, 90), V3D(-140, 140, -90), V3D(-140, -140, -90) });
+		poly.myTris.push_back({ V3D(-140, 140, 90), V3D(-140, -140, -90), V3D(-140, -140, 90) });
+		poly.myTris.push_back({ V3D(-20, -140, 90), V3D(-20, -20, 90), V3D(-140, -20, 90) });
+		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-140, -20, 90), V3D(-20, -20, 90) });
+		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-140, 140, 90), V3D(-140, -20, 90) });
+		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-20, -140, 90), V3D(140, -140, 140) });
+		poly.myTris.push_back({ V3D(140, 140, 140), V3D(-20, 140, 90), V3D(140, -140, 140) });
+		poly.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
+		poly.myDiffusion = 0.05;
+		poly.myIsLight = false;
 
-		myTris.push_back(tri);
+		myPolyObjects.push_back(poly);
 	}
-	{ // left wall 2
-		TriObject tri;
-		tri.myCorners[0] = V3D(-140, 140, 90);
-		tri.myCorners[1] = V3D(-140, -140, -90);
-		tri.myCorners[2] = V3D(-140, -140, 90);
-		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-		tri.myDiffusion = 0.05;
-		tri.myIsLight = false;
-
-		myTris.push_back(tri);
-	}
-
-	{ // back wall 1
-		TriObject tri;
-		tri.myCorners[0] = V3D(-20, -140, 90);
-		tri.myCorners[1] = V3D(-20, -20, 90);
-		tri.myCorners[2] = V3D(-140, -20, 90);
-		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-		tri.myDiffusion = 0.05;
-		tri.myIsLight = false;
-
-		myTris.push_back(tri);
-	}
-	{ // back wall 2
-		TriObject tri;
-		tri.myCorners[0] = V3D(-20, 140, 90);
-		tri.myCorners[1] = V3D(-140, -20, 90);
-		tri.myCorners[2] = V3D(-20, -20, 90);
-		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-		tri.myDiffusion = 0.05;
-		tri.myIsLight = false;
-
-		myTris.push_back(tri);
-	}
-	{ // back wall 3
-		TriObject tri;
-		tri.myCorners[0] = V3D(-20, 140, 90);
-		tri.myCorners[1] = V3D(-140, 140, 90);
-		tri.myCorners[2] = V3D(-140, -20, 90);
-		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-		tri.myDiffusion = 0.05;
-		tri.myIsLight = false;
-
-		myTris.push_back(tri);
-	}
-	{ // back wall 4
-		TriObject tri;
-		tri.myCorners[0] = V3D(-20, 140, 90);
-		tri.myCorners[1] = V3D(-20, -140, 90);
-		tri.myCorners[2] = V3D(140, -20, 140);
-		tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-		tri.myDiffusion = 0.05;
-		tri.myIsLight = false;
-
-		myTris.push_back(tri);
-	}
-	//{ // back wall 5
-	//	TriObject tri;
-	//	tri.myCorners[0] = V3D(-20, 140, 90);
-	//	tri.myCorners[1] = V3D(-140, -20, 90);
-	//	tri.myCorners[2] = V3D(140, -20, 90);
-	//	tri.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-	//	tri.myDiffusion = 0.05;
-	//	tri.myIsLight = false;
-	//
-	//	myTris.push_back(tri);
-	//}
 }
 
 void RayRenderer::SetBoundingSize(double aSize)
@@ -241,37 +164,13 @@ RayRenderer::RayHit RayRenderer::Cast(RAY aRay) const
 			}
 		}
 	}
-	for (auto& tri : myTris)
+	for (auto& poly : myPolyObjects)
 	{
-		CommonUtilities::Plane<double> plane(tri.myCorners[0], tri.myCorners[1], tri.myCorners[2]);
-		V3D intersect;
-		if (CommonUtilities::IntersectionPlaneRay(plane,aRay,intersect))
+		RayHit hit = CastAt(aRay,poly,t);
+		if (t > STANDARDMARG && t < closestT)
 		{
-			std::array<V3D, 3> crosses;
-			for (size_t i = 0; i < tri.myCorners.size(); i++)
-			{
-				V3D toCorner = intersect - tri.myCorners[i];
-				V3D toNext = tri.myCorners[i] - tri.myCorners[(i + 1) % tri.myCorners.size()];
-
-				crosses[i] = toCorner.Cross(toNext).GetNormalized();
-			}
-
-			if (crosses[0].Dot(crosses[1]) > 0 &&
-				crosses[1].Dot(crosses[2]) > 0 &&
-				crosses[2].Dot(crosses[0]) > 0)
-			{
-				t = (intersect - aRay.Position()).Dot(aRay.Direction());
-				if (t < closestT)
-				{
-					closestT = t;
-					result.myHit = true;
-					result.myIsFinal = tri.myIsLight;
-					result.myLocation = intersect;
-					result.mySurfaceNormal = plane.Normal();
-					result.mySurfaceColor = tri.mySurfaceColor;
-					result.mySurfaceDiffusíon = tri.myDiffusion;
-				}
-			}
+			result = hit;
+			closestT = t;
 		}
 	}
 
@@ -314,5 +213,46 @@ RayRenderer::RayHit RayRenderer::Cast(RAY aRay) const
 	}
 
 
+	return result;
+}
+
+RayRenderer::RayHit RayRenderer::CastAt(RAY aRay, PolyObject aObject,double& t) const
+{
+	RayHit result;
+	result.myHit = false;
+	double closestT = _HUGE_ENUF;
+	for (auto& tri : aObject.myTris)
+	{
+		CommonUtilities::Plane<double> plane(tri[0], tri[1], tri[2]);
+		V3D intersect;
+		if (CommonUtilities::IntersectionPlaneRay(plane, aRay, intersect))
+		{
+			std::array<V3D, 3> crosses;
+			for (size_t i = 0; i < tri.size(); i++)
+			{
+				V3D toCorner = intersect - tri[i];
+				V3D toNext = tri[i] - tri[(i + 1) % tri.size()];
+
+				crosses[i] = toCorner.Cross(toNext).GetNormalized();
+			}
+
+			if (crosses[0].Dot(crosses[1]) > 0 &&
+				crosses[1].Dot(crosses[2]) > 0 &&
+				crosses[2].Dot(crosses[0]) > 0)
+			{
+				t = (intersect - aRay.Position()).Dot(aRay.Direction());
+				if (t < closestT)
+				{
+					closestT = t;
+					result.myHit = true;
+					result.myIsFinal = aObject.myIsLight;
+					result.myLocation = intersect;
+					result.mySurfaceNormal = plane.Normal();
+					result.mySurfaceColor = aObject.mySurfaceColor;
+					result.mySurfaceDiffusíon = aObject.myDiffusion;
+				}
+			}
+		}
+	}
 	return result;
 }
