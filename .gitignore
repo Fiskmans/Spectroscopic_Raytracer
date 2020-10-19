@@ -32,7 +32,7 @@ bld/
 [Ll]ogs/
 [Ww]orkbench/
 
-![Bb]in/[Dd]ata/
+![Bb]in/[Dd]ata/**/*
 ![Bb]in/assimp-vc140-mt.dll
 
 # Visual Studio 2015/2017 cache/options directory
