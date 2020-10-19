@@ -17,6 +17,7 @@ public:
 
 	V4F operator()(RAY aRay) const;
 
+	void AddModel(std::string aFilePath);
 
 private:
 	struct RayHit
@@ -41,7 +42,8 @@ private:
 
 	struct PolyObject
 	{
-		std::vector<std::array<V3D,3>>	myTris;
+		typedef std::array<V3D, 3> TriType;
+		std::vector<TriType>	myTris;
 		double myDiffusion;
 		V4F	mySurfaceColor;
 		bool myIsLight;

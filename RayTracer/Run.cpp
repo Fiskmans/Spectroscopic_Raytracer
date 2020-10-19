@@ -87,6 +87,7 @@ int Run()
 	}
 
 	RayRenderer renderer;
+	renderer.AddModel("data/models/test.fbx");
 	renderer.SetBoundingSize(150.0);
 
 	{

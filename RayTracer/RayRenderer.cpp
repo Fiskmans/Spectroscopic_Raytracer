@@ -3,20 +3,23 @@
 #include "Intersection.hpp"
 #include "DebugDrawer.h"
 #include "Random.h"
-
+#include "AssImp\mesh.h"
+#include "AssImp\scene.h"
+#include "AssImp\cimport.h"
+#include "AssImp\postprocess.h"
 
 //https://learn.foundry.com/modo/content/help/pages/shading_lighting/shader_items/refract_index.html
 
 RayRenderer::RayRenderer()
 {
-	{ // middle
-		SphereObject sphere;
-		sphere.mySphere.InitWithCenterAndRadius({ 0,0,0 }, 50.0);
-		sphere.mySurfaceColor = V4F(1, 1, 1, 1);
-		sphere.myDiffusion = 0.03;
-
-		mySpheres.push_back(sphere);
-	}
+	//{ // middle
+	//	SphereObject sphere;
+	//	sphere.mySphere.InitWithCenterAndRadius({ 0,0,0 }, 50.0);
+	//	sphere.mySurfaceColor = V4F(1, 1, 1, 1);
+	//	sphere.myDiffusion = 0.03;
+	//
+	//	mySpheres.push_back(sphere);
+	//}
 	{ // front top right
 		SphereObject sphere;
 		sphere.mySphere.InitWithCenterAndRadius({ 30,30,-70 }, 20.0);
@@ -83,7 +86,7 @@ void RayRenderer::DrawTestRay(RAY aRay)
 
 	RAY current = aRay;
 	RayHit hitResult = Cast(current);
-	while (true)
+	for (size_t i = 0; i < myMaxDepth; i++)
 	{
 		if (hitResult.myHit)
 		{
@@ -110,6 +113,87 @@ void RayRenderer::DrawTestRay(RAY aRay)
 V4F RayRenderer::operator()(RAY aRay) const
 {
 	return Evaluate(aRay);
+}
+
+void RayRenderer::AddModel(std::string aFilePath)
+{
+	const aiScene* scene = NULL;
+
+	scene = aiImportFile(aFilePath.c_str(), aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_ConvertToLeftHanded);
+
+	if (!scene)
+	{
+		SYSERROR(aiGetErrorString(), aFilePath);
+		return;
+	}
+
+	std::deque<const aiNode*> nodeStack;
+	nodeStack.push_back(scene->mRootNode);
+	while (!nodeStack.empty())
+	{
+		const aiNode* current = nodeStack.back();
+		nodeStack.pop_back();
+
+		for (size_t i = 0; i < current->mNumChildren; i++)
+		{
+			nodeStack.push_back(current->mChildren[i]);
+		}
+
+		aiMatrix4x4 transform;
+		{
+			std::stack<const aiNode*> parentStack;
+			const aiNode* parentSeeker = current->mParent;
+			while (parentSeeker)
+			{
+				parentStack.push(parentSeeker);
+				parentSeeker = parentSeeker->mParent;
+			}
+			while (!parentStack.empty())
+			{
+				const aiNode* p = parentStack.top();
+				parentStack.pop();
+				transform *= p->mTransformation;
+			}
+			transform *= current->mTransformation;
+		}
+
+		for (size_t i = 0; i < current->mNumMeshes; i++)
+		{
+			PolyObject obj;
+			const aiMesh* mesh = scene->mMeshes[current->mMeshes[i]];
+
+			std::vector<V3D> vertexes;
+			for (size_t i = 0; i < mesh->mNumVertices; i++)
+			{
+				aiVector3D vec = mesh->mVertices[i];
+				vec *= transform;
+				vertexes.push_back(V3D(vec.x, vec.y, vec.z));
+			}
+
+			for (size_t n = 0; n < mesh->mNumFaces; n++)
+			{
+				const aiFace* face = mesh->mFaces + n;
+				if (face->mNumIndices < 3)
+				{
+					continue;
+				}
+				PolyObject::TriType tri;
+
+				tri[0] = vertexes[face->mIndices[0]];
+				for (size_t i = 1; i < face->mNumIndices-1; i++)
+				{
+					tri[1] = vertexes[face->mIndices[i]];
+					tri[2] = vertexes[face->mIndices[i+1]];
+					obj.myTris.push_back(tri);
+				}
+			}
+			obj.myDiffusion = 0.05;
+			obj.myIsLight = false;
+			obj.mySurfaceColor = V4F(0.6, 0.6, 0.6, 1);
+			myPolyObjects.push_back(obj);
+		}
+	}
+
 }
 
 V4F RayRenderer::Evaluate(RAY aRay, int aDepth) const
