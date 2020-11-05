@@ -27,7 +27,7 @@ private:
 		V4F mySurfaceColor;
 		V3D mySurfaceNormal;
 		V3D myLocation;
-		double mySurfaceDiffusíon;
+		double mySurfaceReflectivity;
 
 		bool myIsFinal;
 	};
@@ -44,7 +44,7 @@ private:
 	{
 		typedef std::array<V3D, 3> TriType;
 		std::vector<TriType>	myTris;
-		double myDiffusion;
+		double myReflectivity;
 		V4F	mySurfaceColor;
 		bool myIsLight;
 	};

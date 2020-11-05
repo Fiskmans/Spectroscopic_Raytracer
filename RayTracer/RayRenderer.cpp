@@ -34,7 +34,7 @@ RayRenderer::RayRenderer()
 		PolyObject poly;
 		poly.myTris.push_back({ V3D(-20, -140, 90), V3D(-140, -20, 90), V3D(-140, -140, 0) });
 		poly.mySurfaceColor = V4F(1, 0.8, 0.7, 1);
-		poly.myDiffusion = 0.2;
+		poly.myReflectivity = 0.2;
 		poly.myIsLight = false;
 
 		myPolyObjects.push_back(poly);
@@ -45,7 +45,7 @@ RayRenderer::RayRenderer()
 		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-140, 140, 90), V3D(-140, 140, 0) });
 		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-20, 140, 0), V3D(-140, 140, 0) });
 		poly.mySurfaceColor = V4F(1, 1, 1, 1);
-		poly.myDiffusion = 0.0;
+		poly.myReflectivity = 0.0;
 		poly.myIsLight = true;
 
 		myPolyObjects.push_back(poly);
@@ -61,7 +61,7 @@ RayRenderer::RayRenderer()
 		poly.myTris.push_back({ V3D(-20, 140, 90), V3D(-20, -140, 90), V3D(140, -140, 140) });
 		poly.myTris.push_back({ V3D(140, 140, 140), V3D(-20, 140, 90), V3D(140, -140, 140) });
 		poly.mySurfaceColor = V4F(0.8, 0.8, 0.8, 1);
-		poly.myDiffusion = 0.05;
+		poly.myReflectivity = 0.05;
 		poly.myIsLight = false;
 
 		myPolyObjects.push_back(poly);
@@ -97,7 +97,19 @@ void RayRenderer::DrawTestRay(RAY aRay)
 				break;
 			}
 
-			V3D dir = current.Direction().Reflected(hitResult.mySurfaceNormal);
+			V3D dir;
+			if (Tools::RandomNormalized() < hitResult.mySurfaceReflectivity)
+			{
+				dir = current.Direction().Reflected(hitResult.mySurfaceNormal);
+			}
+			else
+			{
+				dir = Tools::RandomDirection();
+				if (dir.Dot(hitResult.mySurfaceNormal) < 0)
+				{
+					dir = -dir;
+				}
+			}
 			current.InitWithOriginAndDirection(hitResult.myLocation + dir * STANDARDMARG, dir);
 
 			hitResult = Cast(current);
@@ -187,7 +199,7 @@ void RayRenderer::AddModel(std::string aFilePath)
 					obj.myTris.push_back(tri);
 				}
 			}
-			obj.myDiffusion = 0.05;
+			obj.myReflectivity = 0.1;
 			obj.myIsLight = false;
 			obj.mySurfaceColor = V4F(0.6, 0.6, 0.6, 1);
 			myPolyObjects.push_back(obj);
@@ -211,15 +223,28 @@ V4F RayRenderer::Evaluate(RAY aRay, int aDepth) const
 		return hitResult.mySurfaceColor;
 	}
 
-	Color *= hitResult.mySurfaceColor;
+
+	if (Tools::RandomNormalized() < hitResult.mySurfaceReflectivity)
 	{
 		V3D dir = aRay.Direction().Reflected(hitResult.mySurfaceNormal);
 
 		RAY sampleRay;
-		V3D sampleDir = dir + V3D(Tools::RandomDirection()) * hitResult.mySurfaceDiffusíon;
+		V3D sampleDir = dir + V3D(Tools::RandomDirection()) * hitResult.mySurfaceReflectivity;
 		sampleRay.InitWithOriginAndDirection(hitResult.myLocation + sampleDir * STANDARDMARG, sampleDir);
 
 		Color *= Evaluate(sampleRay, aDepth + 1);
+	}
+	else
+	{
+		RAY sampleRay;
+		V3D sampleDir = Tools::RandomDirection();
+		if (sampleDir.Dot(hitResult.mySurfaceNormal) < 0)
+		{
+			sampleDir = -sampleDir;
+		}
+		sampleRay.InitWithOriginAndDirection(hitResult.myLocation + sampleDir * STANDARDMARG, sampleDir);
+
+		Color *= hitResult.mySurfaceColor * Evaluate(sampleRay, aDepth + 1);
 	}
 
 	return Color;
@@ -244,7 +269,7 @@ RayRenderer::RayHit RayRenderer::Cast(RAY aRay) const
 				result.myLocation = aRay.Position() + aRay.Direction() * t;
 				result.mySurfaceNormal = (result.myLocation - sphere.mySphere.myPosition).GetNormalized();
 				result.mySurfaceColor = sphere.mySurfaceColor;
-				result.mySurfaceDiffusíon = sphere.myDiffusion;
+				result.mySurfaceReflectivity = sphere.myDiffusion;
 			}
 		}
 	}
@@ -290,7 +315,7 @@ RayRenderer::RayHit RayRenderer::Cast(RAY aRay) const
 
 					result.mySurfaceColor *= ((parity == 0) ? V4F(1, 1, 1, 1) : V4F(0.6, 0.6, 0.6, 1));
 
-					result.mySurfaceDiffusíon = 0;
+					result.mySurfaceReflectivity = 0;
 				}
 			}
 		}
@@ -333,7 +358,7 @@ RayRenderer::RayHit RayRenderer::CastAt(RAY aRay, PolyObject aObject,double& t) 
 					result.myLocation = intersect;
 					result.mySurfaceNormal = plane.Normal();
 					result.mySurfaceColor = aObject.mySurfaceColor;
-					result.mySurfaceDiffusíon = aObject.myDiffusion;
+					result.mySurfaceReflectivity = aObject.myReflectivity;
 				}
 			}
 		}
