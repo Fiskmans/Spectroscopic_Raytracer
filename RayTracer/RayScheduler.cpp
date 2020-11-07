@@ -21,9 +21,16 @@ RayScheduler::RayScheduler(size_t aWidth, size_t aHeight, ID3D11Texture2D* aTarg
 
 	myCPUTexture = new V4F[pixelCount];
 	mySamplesInPixel = new unsigned short[pixelCount];
+	mysecondaryBuffer = new V4F[pixelCount];
+	myPixelUncertanity = new float[pixelCount];
+
+	myShowUncertenityIMGUI = false;
+	myShowUncertenity = false;
+
 	for (size_t i = 0; i < pixelCount; i++)
 	{
 		mySamplesInPixel[i] = 0;
+		myPixelUncertanity[i] = 1.f;
 	}
 
 	size_t hardwareThreads = std::thread::hardware_concurrency();
@@ -66,6 +73,8 @@ RayScheduler::~RayScheduler()
 {
 	SAFE_RELEASE(myTargetTexture);
 	SAFE_DELETE_ARRAY(myCPUTexture);
+	SAFE_DELETE_ARRAY(mysecondaryBuffer);
+	SAFE_DELETE_ARRAY(myPixelUncertanity);
 	*myKillSwitch = false;
 	for (auto& i : myWorkers)
 	{
@@ -91,6 +100,10 @@ void RayScheduler::PushToHardware()
 	if (SUCCEEDED(result))
 	{
 		char* readHead = reinterpret_cast<char*>(myCPUTexture);
+		if (myShowUncertenity ^ myShowUncertenityIMGUI)
+		{
+			readHead = reinterpret_cast<char*>(mysecondaryBuffer);
+		}
 		size_t rowSize = desc.Width * sizeof(V4F);
 		for (size_t i = 0; i < desc.Height; i++)
 		{
@@ -111,6 +124,11 @@ void RayScheduler::Imgui()
 			{
 				RenderAll();
 			}
+			if (ImGui::Button("Render Worst"))
+			{
+				mySections.push_back(FindWorstSection());
+			}
+
 			int wanted = mySPP;
 			if (ImGui::InputInt("Samples per pixel", &wanted))
 			{
@@ -130,6 +148,7 @@ void RayScheduler::Imgui()
 				}
 				ImGui::TreePop();
 			}
+			ImGui::Checkbox("Uncertanity",&myShowUncertenityIMGUI);
 		});
 
 
@@ -180,6 +199,7 @@ void RayScheduler::Imgui()
 		}
 	}
 
+	myShowUncertenity = ImGui::GetIO().KeyShift;
 }
 
 void RayScheduler::Update()
@@ -220,6 +240,40 @@ void RayScheduler::Update()
 			WorkSection(sec);
 		}
 	}
+
+	if (mySections.empty())
+	{
+		mySections.push_back(FindWorstSection());
+	}
+}
+
+RayScheduler::Section RayScheduler::FindWorstSection()
+{
+	const size_t size = 32;
+
+	Section ret;
+	float* tmp = new float[(myWidth- size) * (myHeight - size)];
+	for (size_t y = 0; y < myHeight - size; y++)
+	{
+		for (size_t x = 0; x < myWidth - size; x++)
+		{
+			tmp[y * (myWidth - size) + x] = 0;
+			for (size_t y1 = y; y1 < y + size; y1++)
+			{
+				for (size_t x1 = x; x1 < x + size; x1++)
+				{
+					tmp[y * (myWidth - size) + x] += myPixelUncertanity[y1 * myWidth + x1];
+				}
+			}
+		}
+	}
+	size_t highestIndex = std::max_element(tmp, tmp + ((myWidth - size) * (myHeight - size))) - tmp;
+	ret.x = highestIndex % (myWidth - size);
+	ret.y = highestIndex / (myWidth - size);
+	ret.z = ret.x + size;
+	ret.w = ret.y + size;
+	delete[] tmp;
+	return ret;
 }
 
 void RayScheduler::SplitSection(Section aSection)
@@ -283,7 +337,12 @@ void RayScheduler::ApplyColor(Result& aResult)
 	size_t index = (aResult.y * myWidth + aResult.x);
 	mySamplesInPixel[index] += aResult.samples;
 
-	myCPUTexture[index] = LERP(myCPUTexture[index], aResult.color, float(aResult.samples) / mySamplesInPixel[index]);
+	V4F newColor = LERP(myCPUTexture[index], aResult.color, float(aResult.samples) / mySamplesInPixel[index]);
+	float change = newColor.Distance(myCPUTexture[index]);
+
+	myPixelUncertanity[index] = LERP(change, myPixelUncertanity[index], std::pow(0.9,aResult.samples));
+	myCPUTexture[index] = newColor;
+	mysecondaryBuffer[index] = V4F(myPixelUncertanity[index], myPixelUncertanity[index], myPixelUncertanity[index], 1);
 }
 
 bool RayScheduler::Schedule(RayScheduler::Result aJob)

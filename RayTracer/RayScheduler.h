@@ -55,6 +55,8 @@ private:
 		RayScheduler::Result myReadyData;
 	};
 
+	Section FindWorstSection();
+
 	void SplitSection(Section aSection);
 
 	void WorkSection(Section aSection);
@@ -76,8 +78,12 @@ private:
 	std::vector<RayScheduler::Result> myUnassigned;
 
 	V4F* myCPUTexture;
+	V4F* mysecondaryBuffer;
 	unsigned short* mySamplesInPixel;
+	float* myPixelUncertanity;
 
+	bool myShowUncertenity;
+	bool myShowUncertenityIMGUI;
 	size_t myWidth;
 	size_t myHeight;
 	Camera* myCamera;
